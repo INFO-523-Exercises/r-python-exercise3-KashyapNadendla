@@ -1,0 +1,684 @@
+---
+title: "r-python-exercise3-KashyapNadendla"
+format: html
+editor: visual
+---
+
+# Classification: Basic Concepts and Techniques
+
+## SETUP
+
+```{r}
+
+if(!require(pacman))
+  install.packages("pacman")
+
+#install.packages("~/Downloads/FSelector_0.34.tgz", repos = NULL, type = "source")
+
+#install.packages("FSelector")
+pacman::p_load(tidyverse, rpart, rpart.plot, caret, 
+  lattice, sampling, pROC, mlbench,FSelector)
+```
+
+## Loading the dataset
+
+```{r}
+
+data(Zoo, package="mlbench")
+head(Zoo)
+```
+
+```{r}
+
+as_tibble(Zoo, rownames = "animal")
+```
+
+```{r warning=FALSE}
+
+Zoo <- Zoo |>
+  mutate(across(where(is.logical), factor, levels = c(TRUE, FALSE))) |>
+  mutate(across(where(is.character), factor))
+```
+
+```{r}
+
+summary(Zoo)
+```
+
+## Decision Trees
+
+```{r}
+
+library(rpart)
+
+tree_default <- Zoo |> 
+  rpart(type ~ ., data = _)
+tree_default
+```
+
+```{r}
+
+library(rpart.plot)
+rpart.plot(tree_default, extra = 2)
+```
+
+## Create a Full Tree
+
+```{r}
+
+tree_full <- Zoo |> 
+  rpart(type ~ . , data = _, 
+        control = rpart.control(minsplit = 2, cp = 0))
+rpart.plot(tree_full, extra = 2, 
+           roundint=FALSE,
+            box.palette = list("Gy", "Gn", "Bu", "Bn", 
+                               "Or", "Rd", "Pu")) # specify 7 colors
+```
+
+```{r}
+
+tree_full
+```
+
+```{r}
+
+predict(tree_default, Zoo) |> head ()
+```
+
+```{r}
+
+pred <- predict(tree_default, Zoo, type="class")
+head(pred)
+```
+
+```{r}
+
+confusion_table <- with(Zoo, table(type, pred))
+confusion_table
+```
+
+```{r}
+
+correct <- confusion_table |> diag() |> sum()
+correct
+```
+
+```{r}
+
+error <- confusion_table |> sum() - correct
+error
+```
+
+```{r}
+
+accuracy <- correct / (correct + error)
+accuracy
+```
+
+### Using a function for accuracy
+
+```{r}
+
+accuracy <- function(truth,prediction){
+  tbl <- table(truth,prediction)
+  sum(diag(tbl)/sum(tbl))
+}
+
+accuracy(Zoo |> pull(type), pred)
+```
+
+### Training error of the full tree
+
+```{r}
+
+accuracy(Zoo |> pull(type), 
+         predict(tree_full, Zoo, type = "class"))
+```
+
+### Get a confusion table with more statistics (using caret)
+
+```{r}
+
+library(caret)
+confusionMatrix(data = pred, 
+                reference = Zoo |> pull(type))
+```
+
+## Make Predictions for New Data
+
+Making our own animal: A lion with featured wings!
+
+```{r}
+
+my_animal <- tibble(hair = TRUE, feathers = TRUE, eggs = FALSE,
+  milk = TRUE, airborne = TRUE, aquatic = FALSE, predator = TRUE,
+  toothed = TRUE, backbone = TRUE, breathes = TRUE, venomous = FALSE,
+  fins = FALSE, legs = 4, tail = TRUE, domestic = FALSE,
+  catsize = FALSE, type = NA)
+```
+
+Fixing columns to be factors like in the training set.
+
+```{r}
+
+my_animal <- my_animal |> 
+  mutate(across(where(is.logical), factor, levels = c(TRUE, FALSE)))
+my_animal
+```
+
+Making a prediction using the default tree
+
+```{r}
+
+predict(tree_default , my_animal, type = "class")
+```
+
+## Model Evaluation with Caret
+
+```{r}
+
+library(caret)
+```
+
+```{r}
+
+set.seed(2000)
+```
+
+## Hold out Test data
+
+```{r}
+
+inTrain <- createDataPartition(y = Zoo$type, p = .8, list = FALSE)
+Zoo_train <- Zoo |> slice(inTrain)
+```
+
+```{r}
+
+Zoo_test <- Zoo |> slice(-inTrain)
+```
+
+## Learn a Model and Tune Hyperparameters on the Training Data
+
+```{r}
+
+fit <- Zoo_train |>
+  train(type ~.,
+    data = _,
+    method="rpart",
+    control = rpart.control(minsplit = 2),
+    trControl = trainControl(method = "cv", number = 10),
+    tuneLength = 5
+  )
+
+fit
+```
+
+```{r}
+
+rpart.plot(fit$finalModel, extra = 2,
+  box.palette = list("Gy", "Gn", "Bu", "Bn", "Or", "Rd", "Pu"))
+```
+
+```{r}
+
+varImp(fit)
+```
+
+The variable importance without competing splits.
+
+```{r}
+
+imp <- varImp(fit, compete = FALSE)
+imp
+```
+
+```{r}
+
+ggplot(imp)
+```
+
+## **Testing: Confusion Matrix and Confidence Interval for Accuracy**
+
+```{r}
+
+pred <- predict(fit, newdata = Zoo_test)
+pred
+```
+
+```{r}
+
+confusionMatrix(data = pred, 
+                ref = Zoo_test |> pull(type))
+```
+
+## Model Comparison
+
+```{r}
+
+train_index <- createFolds(Zoo_train$type, k = 10)
+
+```
+
+Building models
+
+```{r}
+
+rpartFit <- Zoo_train |> 
+  train(type ~ .,
+        data = _,
+        method = "rpart",
+        tuneLength = 10,
+        trControl = trainControl(method = "cv", indexOut = train_index)
+  )
+```
+
+```{r}
+
+knnFit <- Zoo_train |> 
+  train(type ~ .,
+        data = _,
+        method = "knn",
+        preProcess = "scale",
+          tuneLength = 10,
+          trControl = trainControl(method = "cv", indexOut = train_index)
+  )
+```
+
+comparing accuracy over all folds
+
+```{r}
+
+resamps <- resamples(list(
+        CART = rpartFit,
+        kNearestNeighbors = knnFit
+        ))
+
+summary(resamps)
+```
+
+```{r}
+
+library(lattice)
+bwplot(resamps, layout = c(3, 1))
+```
+
+```{r}
+
+difs <- diff(resamps)
+difs
+```
+
+```{r}
+
+summary(difs)
+```
+
+## **Feature Selection and Feature Preparation**
+
+```{r}
+
+library(FSelector)
+
+```
+
+### **Univariate Feature Importance Score**
+
+```{r}
+
+weights <- Zoo_train |> 
+  chi.squared(type ~ ., data = _) |>
+  as_tibble(rownames = "feature") |>
+  arrange(desc(attr_importance))
+
+weights
+```
+
+```{r}
+
+ggplot(weights,
+  aes(x = attr_importance, y = reorder(feature, attr_importance))) +
+  geom_bar(stat = "identity") +
+  xlab("Importance score") + 
+  ylab("Feature")
+```
+
+5 best features -
+
+```{r}
+subset <- cutoff.k(weights |> 
+                   column_to_rownames("feature"), 5)
+subset
+
+```
+
+Using only the best 5 features to build a model (`Fselector` provides `as.simple.formula`)
+
+```{r}
+
+f <- as.simple.formula(subset, "type")
+f
+```
+
+```{r}
+
+m <- Zoo_train |> rpart(f, data = _)
+rpart.plot(m, extra = 2, roundint = FALSE)
+```
+
+```{r}
+
+Zoo_train |> 
+  gain.ratio(type ~ ., data = _) |>
+  as_tibble(rownames = "feature") |>
+  arrange(desc(attr_importance))
+```
+
+## **Feature Subset Selection**
+
+```{r}
+
+Zoo_train |> 
+  cfs(type ~ ., data = _)
+```
+
+```{r}
+
+evaluator <- function(subset) {
+  model <- Zoo_train |> 
+    train(as.simple.formula(subset, "type"),
+          data = _,
+          method = "rpart",
+          trControl = trainControl(method = "boot", number = 5),
+          tuneLength = 0)
+  results <- model$resample$Accuracy
+  cat("Trying features:", paste(subset, collapse = " + "), "\n")
+  m <- mean(results)
+  cat("Accuracy:", round(m, 2), "\n\n")
+  m
+}
+```
+
+```{r}
+
+features <- Zoo_train |> colnames() |> setdiff("type")
+```
+
+## **Using Dummy Variables for Factors**
+
+```{r}
+
+tree_predator <- Zoo_train |> 
+  rpart(predator ~ type, data = _)
+rpart.plot(tree_predator, extra = 2, roundint = FALSE)
+```
+
+```{r}
+
+Zoo_train_dummy <- as_tibble(class2ind(Zoo_train$type)) |> 
+  mutate(across(everything(), as.factor)) |>
+  add_column(predator = Zoo_train$predator)
+Zoo_train_dummy
+```
+
+```{r}
+
+tree_predator <- Zoo_train_dummy |> 
+  rpart(predator ~ ., 
+        data = _,
+        control = rpart.control(minsplit = 2, cp = 0.01))
+rpart.plot(tree_predator, roundint = FALSE)
+```
+
+```{r}
+
+fit <- Zoo_train |> 
+  train(predator ~ type, 
+        data = _, 
+        method = "rpart",
+        control = rpart.control(minsplit = 2),
+        tuneGrid = data.frame(cp = 0.01))
+fit
+```
+
+```{r}
+
+rpart.plot(fit$finalModel, extra = 2)
+```
+
+## **Class Imbalance**
+
+```{r}
+
+library(rpart)
+library(rpart.plot)
+data(Zoo, package="mlbench")
+```
+
+```{r}
+
+ggplot(Zoo, aes(y = type)) + geom_bar()
+```
+
+```{r}
+
+Zoo_reptile <- Zoo |> 
+  mutate(type = factor(Zoo$type == "reptile", 
+                       levels = c(FALSE, TRUE),
+                       labels = c("nonreptile", "reptile")))
+```
+
+```{r}
+
+summary(Zoo_reptile)
+```
+
+```{r}
+
+ggplot(Zoo_reptile, aes(y = type)) + geom_bar()
+```
+
+```{r}
+
+set.seed(1234)
+
+inTrain <- createDataPartition(y = Zoo_reptile$type, p = .5, list = FALSE)
+training_reptile <- Zoo_reptile |> slice(inTrain)
+testing_reptile <- Zoo_reptile |> slice(-inTrain)
+```
+
+## **Option 1: Use the Data As Is and Hope For The Best**
+
+```{r}
+
+fit <- training_reptile |> 
+  train(type ~ .,
+        data = _,
+        method = "rpart",
+        trControl = trainControl(method = "cv"))
+```
+
+```{r}
+
+fit
+```
+
+```{r}
+
+rpart.plot(fit$finalModel, extra = 2)
+```
+
+```{r}
+
+confusionMatrix(data = predict(fit, testing_reptile),
+                ref = testing_reptile$type, positive = "reptile")
+```
+
+## **Option 2: Balance Data With Resampling**
+
+```{r}
+
+library(sampling)
+set.seed(1000) # for repeatability
+
+id <- strata(training_reptile, stratanames = "type", size = c(50, 50), method = "srswr")
+training_reptile_balanced <- training_reptile |> 
+  slice(id$ID_unit)
+table(training_reptile_balanced$type)
+```
+
+```{r}
+
+fit <- training_reptile_balanced |> 
+  train(type ~ .,
+        data = _,
+        method = "rpart",
+        trControl = trainControl(method = "cv"),
+        control = rpart.control(minsplit = 5))
+
+fit
+```
+
+```{r}
+
+rpart.plot(fit$finalModel, extra = 2)
+```
+
+```{r}
+
+confusionMatrix(data = predict(fit, testing_reptile),
+                ref = testing_reptile$type, positive = "reptile")
+```
+
+```{r}
+
+id <- strata(training_reptile, stratanames = "type", size = c(50, 100), method = "srswr")
+training_reptile_balanced <- training_reptile |> 
+  slice(id$ID_unit)
+table(training_reptile_balanced$type)
+```
+
+```{r}
+
+fit <- training_reptile_balanced |> 
+  train(type ~ .,
+        data = _,
+        method = "rpart",
+        trControl = trainControl(method = "cv"),
+        control = rpart.control(minsplit = 5))
+
+confusionMatrix(data = predict(fit, testing_reptile),
+                ref = testing_reptile$type, positive = "reptile")
+```
+
+## **Option 3: Build A Larger Tree and use Predicted Probabilities**
+
+```{r}
+
+fit <- training_reptile |> 
+  train(type ~ .,
+        data = _,
+        method = "rpart",
+        tuneLength = 10,
+        trControl = trainControl(method = "cv",
+        classProbs = TRUE,  ## necessary for predict with type="prob"
+        summaryFunction=twoClassSummary),  ## necessary for ROC
+        metric = "ROC",
+        control = rpart.control(minsplit = 3))
+```
+
+```{r}
+
+fit
+```
+
+```{r}
+
+rpart.plot(fit$finalModel, extra = 2)
+```
+
+```{r}
+
+confusionMatrix(data = predict(fit, testing_reptile),
+                ref = testing_reptile$type, positive = "reptile")
+```
+
+#### Create A Biased Classifier
+
+```{r}
+
+prob <- predict(fit, testing_reptile, type = "prob")
+tail(prob)
+```
+
+```{r}
+
+pred <- as.factor(ifelse(prob[,"reptile"]>=0.01, "reptile", "nonreptile"))
+
+confusionMatrix(data = pred,
+                ref = testing_reptile$type, positive = "reptile")
+```
+
+## Plot the ROC Curve
+
+```{r}
+
+library("pROC")
+r <- roc(testing_reptile$type == "reptile", prob[,"reptile"])
+```
+
+```{r}
+
+r
+```
+
+```{r}
+
+ggroc(r) + geom_abline(intercept = 1, slope = 1, color = "darkgrey")
+```
+
+## **Option 4: Use a Cost-Sensitive Classifier**
+
+```{r}
+
+cost <- matrix(c(
+  0,   1,
+  100, 0
+), byrow = TRUE, nrow = 2)
+cost
+```
+
+```{r}
+
+fit <- training_reptile |> 
+  train(type ~ .,
+        data = _,
+        method = "rpart",
+        parms = list(loss = cost),
+        trControl = trainControl(method = "cv"))
+```
+
+```{r}
+
+fit 
+```
+
+```{r}
+
+rpart.plot(fit$finalModel, extra = 2)
+```
+
+```{r}
+
+confusionMatrix(data = predict(fit, testing_reptile),
+                ref = testing_reptile$type, positive = "reptile")
+```
+
+```{r}
+
+
+```
+
+```{r}
+
+```
