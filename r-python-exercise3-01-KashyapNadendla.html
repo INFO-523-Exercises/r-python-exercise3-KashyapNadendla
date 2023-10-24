@@ -2,7 +2,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.3.450">
+<meta name="generator" content="quarto-1.3.433">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
@@ -734,8 +734,8 @@ kNearestNeighbors 0.0104                  </code></pre>
    feature  attr_importance
    &lt;chr&gt;              &lt;dbl&gt;
  1 feathers           1    
- 2 milk               1    
- 3 backbone           1    
+ 2 backbone           1    
+ 3 milk               1    
  4 toothed            0.975
  5 eggs               0.933
  6 hair               0.907
@@ -767,7 +767,7 @@ kNearestNeighbors 0.0104                  </code></pre>
 <span id="cb71-2"><a href="#cb71-2" aria-hidden="true" tabindex="-1"></a>                   <span class="fu">column_to_rownames</span>(<span class="st">"feature"</span>), <span class="dv">5</span>)</span>
 <span id="cb71-3"><a href="#cb71-3" aria-hidden="true" tabindex="-1"></a>subset</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>[1] "feathers" "milk"     "backbone" "toothed"  "eggs"    </code></pre>
+<pre><code>[1] "feathers" "backbone" "milk"     "toothed"  "eggs"    </code></pre>
 </div>
 </div>
 <p>Using only the best 5 features to build a model (<code>Fselector</code> provides <code>as.simple.formula</code>)</p>
@@ -775,8 +775,8 @@ kNearestNeighbors 0.0104                  </code></pre>
 <div class="sourceCode cell-code" id="cb73"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb73-1"><a href="#cb73-1" aria-hidden="true" tabindex="-1"></a>f <span class="ot">&lt;-</span> <span class="fu">as.simple.formula</span>(subset, <span class="st">"type"</span>)</span>
 <span id="cb73-2"><a href="#cb73-2" aria-hidden="true" tabindex="-1"></a>f</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>type ~ feathers + milk + backbone + toothed + eggs
-&lt;environment: 0x7fca84d83db8&gt;</code></pre>
+<pre><code>type ~ feathers + backbone + milk + toothed + eggs
+&lt;environment: 0x1251051c0&gt;</code></pre>
 </div>
 </div>
 <div class="cell">
@@ -795,9 +795,9 @@ kNearestNeighbors 0.0104                  </code></pre>
 <pre><code># A tibble: 16 × 2
    feature  attr_importance
    &lt;chr&gt;              &lt;dbl&gt;
- 1 milk              1     
- 2 backbone          1     
- 3 feathers          1     
+ 1 backbone          1     
+ 2 milk              1.00  
+ 3 feathers          1.00  
  4 toothed           0.919 
  5 eggs              0.827 
  6 breathes          0.821 
@@ -1103,12 +1103,12 @@ Summary of sample sizes: 90, 90, 90, 90, 90, 90, ...
 Resampling results across tuning parameters:
 
   cp    Accuracy  Kappa
-  0.18  0.81      0.62 
-  0.30  0.63      0.26 
-  0.34  0.53      0.06 
+  0.22  0.78      0.56 
+  0.26  0.67      0.34 
+  0.34  0.54      0.08 
 
 Accuracy was used to select the optimal model using the largest value.
-The final value used for the model was cp = 0.18.</code></pre>
+The final value used for the model was cp = 0.22.</code></pre>
 </div>
 </div>
 <div class="cell">
@@ -1125,26 +1125,26 @@ The final value used for the model was cp = 0.18.</code></pre>
 
             Reference
 Prediction   nonreptile reptile
-  nonreptile         19       0
-  reptile            29       2
+  nonreptile         33       0
+  reptile            15       2
                                           
-               Accuracy : 0.42            
-                 95% CI : (0.2819, 0.5679)
+               Accuracy : 0.7             
+                 95% CI : (0.5539, 0.8214)
     No Information Rate : 0.96            
-    P-Value [Acc &gt; NIR] : 1               
+    P-Value [Acc &gt; NIR] : 1.0000000       
                                           
-                  Kappa : 0.0498          
+                  Kappa : 0.1497          
                                           
- Mcnemar's Test P-Value : 1.999e-07       
+ Mcnemar's Test P-Value : 0.0003006       
                                           
-            Sensitivity : 1.00000         
-            Specificity : 0.39583         
-         Pos Pred Value : 0.06452         
-         Neg Pred Value : 1.00000         
-             Prevalence : 0.04000         
-         Detection Rate : 0.04000         
-   Detection Prevalence : 0.62000         
-      Balanced Accuracy : 0.69792         
+            Sensitivity : 1.0000          
+            Specificity : 0.6875          
+         Pos Pred Value : 0.1176          
+         Neg Pred Value : 1.0000          
+             Prevalence : 0.0400          
+         Detection Rate : 0.0400          
+   Detection Prevalence : 0.3400          
+      Balanced Accuracy : 0.8438          
                                           
        'Positive' Class : reptile         
                                           </code></pre>
